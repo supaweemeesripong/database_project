@@ -89,4 +89,24 @@ VALUES
   ('Bathroom-Focused Cleaning', 'Deep clean bathroom only', 350, 1, 1, TRUE),
   ('Furniture & Floor Care', 'Wipe furniture, mop, polish', 750, 2, 5, TRUE);
 
-
+--search function
+CREATE OR REPLACE FUNCTION fn_search_services(
+    p_keyword TEXT
+)
+RETURNS TABLE (
+    service_id INT,
+    service_name VARCHAR,
+    description TEXT,
+    base_price NUMERIC,
+    estimated_duration_times INT,
+    required_cleaners INT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT s.id, s.name, s.description, s.base_price, s.estimated_duration_times, s.required_cleaners
+    FROM services s
+    WHERE s.business_id = p_business_id
+      AND s.is_active = TRUE
+      AND s.name ILIKE '%' || p_keyword || '%';
+END;
+$$ LANGUAGE plpgsql;
