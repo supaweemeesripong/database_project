@@ -21,3 +21,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+
+--User table
+CREATE TABLE user_account (
+    user_id SERIAL PRIMARY KEY,
+    username TEXT,
+    password TEXT,
+    role TEXT DEFAULT 'student' 
+);
+
+-- test user 
+INSERT INTO user_account (username, password, role) 
+VALUES ('demo_user', '1234', 'student');
+SELECT fn_login_with_username_and_password('ghost_user', '1235');
