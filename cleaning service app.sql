@@ -22,7 +22,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
---User table
+-- 1. User table-----
 CREATE TABLE  IF NOT EXISTS user_account (
     user_id SERIAL PRIMARY KEY,
     username TEXT,
@@ -36,6 +36,7 @@ VALUES ('demo_user', '1234', 'student');
 SELECT fn_login_with_username_and_password('ghost_user', '1235');
 
 
+----services functions-----
 CREATE OR REPLACE FUNCTION fn_list_available_services()
 RETURNS TABLE (
     service_id INT,
@@ -62,7 +63,7 @@ BEGIN
 END;
 $$;
 
---Available services Table
+-- 2.services Table-----
 CREATE TABLE IF NOT EXISTS Services (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -89,7 +90,7 @@ VALUES
   ('Bathroom-Focused Cleaning', 'Deep clean bathroom only', 350, 1, 1, TRUE),
   ('Furniture & Floor Care', 'Wipe furniture, mop, polish', 750, 2, 5, TRUE);
 
---search function
+--search function-----
 CREATE OR REPLACE FUNCTION fn_search_services(
     p_keyword TEXT
 )
@@ -123,7 +124,7 @@ $$ LANGUAGE plpgsql;
 
 
 
---cleaner profiles table with 10+ rows data
+--3.Cleaner Table-----
 
 CREATE TABLE IF NOT EXISTS team_profiles (
     profile_id SERIAL PRIMARY KEY,
@@ -149,7 +150,7 @@ INSERT INTO team_profiles (cleaner_username, full_name, bio, rating) VALUES
 ('cleaner_move', 'Deposit Saver', 'Guaranteed clean to help you get your dorm deposit back.', 5.0);
 
 
---function for users to find top rating cleaner 
+--function for users to find top rating cleaner---- 
 
 CREATE OR REPLACE FUNCTION fn_get_top_rated_teams(p_min_rating DECIMAL)
 RETURNS TABLE(name TEXT, biography TEXT, stars DECIMAL) AS $$
@@ -163,7 +164,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
----Users Location Data
+---4.Location Table------
 CREATE TABLE dorm_locations (
     location_id SERIAL PRIMARY KEY,
     user_name TEXT,       
@@ -186,6 +187,7 @@ INSERT INTO dorm_locations (user_name, dorm_name, building_name, room_number) VA
 ('student_ivy', 'Tangsin Dorm', 'Building A', '413'),
 ('student_jack', 'Victory Corner', 'North', '777');
 
+---
 CREATE OR REPLACE FUNCTION fn_get_user_location(p_user TEXT)
 RETURNS dorm_locations AS $$
 DECLARE
@@ -204,7 +206,7 @@ $$ LANGUAGE plpgsql;
 
 
 
---Date and time of services 
+---5.Date and time Table-------
 
 CREATE TABLE IF NOT EXISTS service_date_time (
     availability_id SERIAL PRIMARY KEY,
@@ -304,3 +306,105 @@ BEGIN
         match_start ASC;
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- 6. Bookings table -----
+CREATE TABLE IF NOT EXISTS bookings (
+    booking_id SERIAL PRIMARY KEY,
+
+   
+    customer_username TEXT NOT NULL,
+    cleaner_username  TEXT NOT NULL,
+
+    
+    service_id  INT NOT NULL REFERENCES services(id),
+    location_id INT NOT NULL REFERENCES dorm_locations(location_id),
+
+    
+    booking_date DATE NOT NULL,
+    start_time   TIME NOT NULL,
+    end_time     TIME NOT NULL,
+
+   
+    status TEXT CHECK (status IN ('pending','confirmed','completed','cancelled'))
+        DEFAULT 'pending',
+
+   
+    total_price NUMERIC(10, 2) NOT NULL,
+
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- create a new booking based on service duration
+CREATE OR REPLACE FUNCTION fn_create_booking(
+    p_customer_username TEXT,
+    p_cleaner_username  TEXT,
+    p_service_id        INT,
+    p_location_id       INT,
+    p_booking_date      DATE,
+    p_start_time        TIME
+)
+RETURNS INT AS $$
+DECLARE
+    v_booking_id     INT;
+    v_duration_hours INT;
+    v_end_time       TIME;
+    v_price          NUMERIC(10,2);
+BEGIN
+    -- get service duration & base price
+    SELECT estimated_duration_times,
+           base_price
+    INTO   v_duration_hours,
+           v_price
+    FROM services
+    WHERE id = p_service_id
+      AND is_active = TRUE;
+
+    IF v_duration_hours IS NULL THEN
+        RAISE EXCEPTION 'Service % not found or inactive', p_service_id;
+    END IF;
+
+    -- calculate end_time: start + duration (in HOURS)
+    v_end_time := (p_start_time::time + (v_duration_hours || ' hours')::interval)::time;
+
+    -- insert booking
+    INSERT INTO bookings (
+        customer_username,
+        cleaner_username,
+        service_id,
+        location_id,
+        booking_date,
+        start_time,
+        end_time,
+        status,
+        total_price
+    )
+    VALUES (
+        p_customer_username,
+        p_cleaner_username,
+        p_service_id,
+        p_location_id,
+        p_booking_date,
+        p_start_time,
+        v_end_time,
+        'pending',
+        v_price
+    )
+    RETURNING booking_id INTO v_booking_id;
+
+    RETURN v_booking_id;
+END;
+$$ LANGUAGE plpgsql;
+
+
+--- input of create_booking function, then it will return new booking id----
+SELECT fn_create_booking(
+    'student_tang',    -- customer
+    'cleaner_joy',     -- cleaner
+    1,                 -- service_id
+    1,                 -- location_id
+    '2025-12-05',      -- date
+    '11:00'            -- start_time
+);
+
