@@ -23,7 +23,7 @@ $$ LANGUAGE plpgsql;
 
 
 --User table
-CREATE TABLE user_account (
+CREATE TABLE  IF NOT EXISTS user_account (
     user_id SERIAL PRIMARY KEY,
     username TEXT,
     password TEXT,
@@ -215,6 +215,7 @@ CREATE TABLE IF NOT EXISTS service_date_time (
     end_time TIME NOT NULL
 );
 
+
 INSERT INTO service_date_time (user_name, role, available_date, start_time, end_time) VALUES
 
 ('student_tang',      'customer', '2025-12-05', '10:00', '12:00'),
@@ -236,7 +237,8 @@ ADD CONSTRAINT service_dt_unique UNIQUE (user_name, role, available_date, start_
 
 
 
---Find available cleners and customers
+
+--save cleaners and customers availble time
 CREATE OR REPLACE FUNCTION fn_save_service_date_time(
     p_user TEXT,
     p_role TEXT,
@@ -260,3 +262,45 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+
+--find matching cleaners, customers available service time
+CREATE OR REPLACE FUNCTION fn_find_matching_cleaners(
+    p_customer_username TEXT,
+    p_date DATE
+)
+RETURNS TABLE (
+    cleaner_username   TEXT,
+    cleaner_full_name  TEXT,
+    rating             DECIMAL(2,1),
+    match_start        TIME,
+    match_end          TIME
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        cl.user_name AS cleaner_username,
+        tp.full_name AS cleaner_full_name,
+        tp.rating,
+        GREATEST(c.start_time, cl.start_time) AS match_start,
+        LEAST(c.end_time,   cl.end_time)      AS match_end
+    FROM service_date_time c
+    JOIN service_date_time cl
+      ON c.available_date = cl.available_date
+    LEFT JOIN team_profiles tp
+      ON tp.cleaner_username = cl.user_name
+    WHERE
+        c.user_name = p_customer_username
+        AND c.role = 'customer'
+        AND cl.role = 'cleaner'
+        AND c.available_date = p_date
+        -- time overlap:
+        AND c.start_time < cl.end_time
+        AND cl.start_time < c.end_time
+        -- make sure overlap is positive, not zero
+        AND GREATEST(c.start_time, cl.start_time)
+            < LEAST(c.end_time, cl.end_time)
+    ORDER BY
+        rating DESC NULLS LAST,
+        match_start ASC;
+END;
+$$ LANGUAGE plpgsql;
