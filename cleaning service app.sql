@@ -474,3 +474,106 @@ $$ LANGUAGE plpgsql;
 
 
 
+
+
+
+
+
+DROP FUNCTION IF EXISTS fn_start_user_subscription;
+DROP TABLE IF EXISTS user_subscriptions CASCADE;
+DROP TABLE IF EXISTS subscription_plans CASCADE;
+
+
+
+
+
+-- 8. Create subscription_plans------
+CREATE TABLE subscription_plans (
+    plan_id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    monthly_price NUMERIC(10,2)
+);
+
+-- Create user_subscription-----
+CREATE TABLE user_subscriptions (
+    subscription_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL, 
+    plan_id INT NOT NULL REFERENCES subscription_plans(plan_id),
+    start_date DATE NOT NULL,
+    next_billing_date DATE,
+    status TEXT DEFAULT 'active'
+);
+
+
+INSERT INTO subscription_plans (plan_id, name, monthly_price) VALUES
+(1,  'Standard Monthly',    300.00), -- ID 1: Your main plan
+(2,  'Student Saver',       250.00), 
+(3,  '3-Month Bundle',      850.00), 
+(4,  '6-Month Bundle',      1600.00),
+(5,  'Yearly Pro',          3000.00),
+(6,  'Weekend Cleaner',     200.00), 
+(7,  'Express Pass',        400.00), 
+(8,  'Team Starter',        500.00), 
+(9,  'Team Growth',         900.00), 
+(10, 'Enterprise',          2500.00),
+(11, 'Holiday Special',     150.00), 
+(12, 'VIP Access',          600.00); 
+
+
+
+
+
+INSERT INTO user_subscriptions (user_id, plan_id, start_date, next_billing_date, status) VALUES
+(1, 1, '2025-11-01', '2025-12-01', 'active'),
+(2, 1, '2025-11-05', '2025-12-05', 'active'),
+(3, 1, '2025-10-15', '2025-11-15', 'expired'),
+(4, 1, '2025-11-20', '2025-12-20', 'active'),
+(5, 1, '2025-12-01', '2026-01-01', 'active'),
+(6, 1, '2025-09-01', '2025-10-01', 'cancelled'),
+(7, 1, '2025-11-10', '2025-12-10', 'active'),
+(8, 1, '2025-11-25', '2025-12-25', 'active'),
+(9, 1, '2025-10-01', '2025-11-01', 'expired'),
+(10, 1, '2025-11-15', '2025-12-15', 'active'),
+(11, 1, '2025-11-28', '2025-12-28', 'active'),
+(12, 1, '2025-12-03', '2026-01-03', 'active');
+
+
+
+
+
+CREATE OR REPLACE FUNCTION fn_start_user_subscription(
+    p_user_id INT,
+    p_plan_id INT,
+    p_start_date DATE
+)
+RETURNS INT AS $$
+DECLARE
+    v_sub_id INT;
+BEGIN
+    INSERT INTO user_subscriptions (
+        user_id, plan_id, start_date, next_billing_date, status
+    )
+    VALUES (
+        p_user_id,
+        p_plan_id,
+        p_start_date,
+        (p_start_date + INTERVAL '1 month')::date, 
+        'active'
+    )
+    RETURNING subscription_id INTO v_sub_id;
+
+    RETURN v_sub_id;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+--Test subscription functio sub_id --
+SELECT fn_start_user_subscription(101, 1, CURRENT_DATE);
+
+
+SELECT fn_start_user_subscription(102, 1, '2025-12-25');
+
+
+SELECT * FROM user_subscriptions ORDER BY subscription_id DESC LIMIT 5;
+
