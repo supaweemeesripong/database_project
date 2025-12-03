@@ -153,5 +153,39 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+---Users Location Data
+CREATE TABLE dorm_locations (
+    location_id SERIAL PRIMARY KEY,
+    user_name TEXT,       
+    dorm_name TEXT,       
+    building_name TEXT,   
+    room_number TEXT          
+);
 
----
+INSERT INTO dorm_locations (user_name, dorm_name, building_name, room_number) VALUES
+('student_tang', 'Tangsin Dorm', 'Building A', '412'),
+('student_alice', 'Tangsin Dorm', 'Building B', '305'),
+('student_bob', 'International House', 'Tower 1', '1002'),
+('student_cat', 'City Park Dorm', 'Wing C', '204'),
+('student_dave', 'Riverside Home', 'Main', '101'),
+('student_eve', 'Green View', 'Block 4', '550'),
+('student_frank', 'The Loft', 'Building A', '808'),
+('student_grace', 'Campus Condo', 'T1', '1204'),
+('student_grace', 'Campus Condo', 'T2', '303'),
+('student_hank', 'Elite Ladies', 'Suite A', '112'),
+('student_ivy', 'Tangsin Dorm', 'Building A', '413'),
+('student_jack', 'Victory Corner', 'North', '777');
+
+CREATE OR REPLACE FUNCTION fn_get_user_location(p_user TEXT)
+RETURNS dorm_locations AS $$
+DECLARE
+    loc dorm_locations;
+BEGIN
+    SELECT *
+    INTO loc
+    FROM dorm_locations
+    WHERE user_name = p_user;
+
+    RETURN loc;
+END;
+$$ LANGUAGE plpgsql;
