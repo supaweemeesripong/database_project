@@ -139,3 +139,19 @@ INSERT INTO team_profiles (cleaner_username, full_name, bio, rating) VALUES
 ('cleaner_move', 'Deposit Saver', 'Guaranteed clean to help you get your dorm deposit back.', 5.0);
 
 
+--function for users to find top rating cleaner 
+
+CREATE OR REPLACE FUNCTION fn_get_top_rated_teams(p_min_rating DECIMAL)
+RETURNS TABLE(name TEXT, biography TEXT, stars DECIMAL) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT full_name, bio, rating
+    FROM team_profiles
+    WHERE rating >= p_min_rating
+    ORDER BY rating DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+---
