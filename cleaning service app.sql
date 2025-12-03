@@ -95,21 +95,31 @@ CREATE OR REPLACE FUNCTION fn_search_services(
 )
 RETURNS TABLE (
     service_id INT,
-    service_name VARCHAR,
+    service_name VARCHAR(100),
     description TEXT,
-    base_price NUMERIC,
+    base_price NUMERIC(10, 2),
     estimated_duration_times INT,
     required_cleaners INT
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT s.id, s.name, s.description, s.base_price, s.estimated_duration_times, s.required_cleaners
+    SELECT 
+        s.id,
+        s.name,
+        s.description,
+        s.base_price,
+        s.estimated_duration_times,
+        s.required_cleaners
     FROM services s
-    WHERE s.business_id = p_business_id
-      AND s.is_active = TRUE
-      AND s.name ILIKE '%' || p_keyword || '%';
+    WHERE s.is_active = TRUE
+      AND (
+           s.name ILIKE '%' || p_keyword || '%' 
+        OR s.description ILIKE '%' || p_keyword || '%'
+      )
+    ORDER BY s.base_price ASC;
 END;
 $$ LANGUAGE plpgsql;
+
 
 
 
@@ -184,8 +194,69 @@ BEGIN
     SELECT *
     INTO loc
     FROM dorm_locations
-    WHERE user_name = p_user;
+    WHERE user_name = p_user
+    ORDER BY location_id DESC
+    LIMIT 1;
 
     RETURN loc;
 END;
 $$ LANGUAGE plpgsql;
+
+
+
+--Date and time of services 
+
+CREATE TABLE IF NOT EXISTS service_date_time (
+    availability_id SERIAL PRIMARY KEY,
+    user_name TEXT NOT NULL,                   
+    role TEXT CHECK (role IN ('customer','cleaner')),
+    available_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL
+);
+
+INSERT INTO service_date_time (user_name, role, available_date, start_time, end_time) VALUES
+
+('student_tang',      'customer', '2025-12-05', '10:00', '12:00'),
+('student_alice',     'customer', '2025-12-05', '13:00', '15:00'),
+('student_bob',       'customer', '2025-12-06', '09:00', '11:00'),
+('student_cat',       'customer', '2025-12-06', '11:30', '14:30'),
+('student_dave',      'customer', '2025-12-07', '14:00', '16:00'),
+('student_ivy',       'customer', '2025-12-07', '08:00', '10:00'),
+('cleaner_joy',       'cleaner',  '2025-12-05', '09:00', '17:00'),
+('cleaner_somchai',   'cleaner',  '2025-12-05', '11:00', '19:00'),
+('cleaner_eco',       'cleaner',  '2025-12-06', '08:00', '14:00'),
+('cleaner_night',     'cleaner',  '2025-12-06', '20:00', '23:00'),
+('cleaner_fast',      'cleaner',  '2025-12-07', '07:00', '10:00'),
+('cleaner_sara',      'cleaner',  '2025-12-07', '10:00', '18:00');
+
+
+ALTER TABLE service_date_time
+ADD CONSTRAINT service_dt_unique UNIQUE (user_name, role, available_date, start_time);
+
+
+
+--Find available cleners and customers
+CREATE OR REPLACE FUNCTION fn_save_service_date_time(
+    p_user TEXT,
+    p_role TEXT,
+    p_date DATE,
+    p_start TIME,
+    p_end TIME
+)
+RETURNS INT AS $$
+DECLARE v_id INT;
+BEGIN
+    INSERT INTO service_date_time (user_name, role, available_date, start_time, end_time)
+    VALUES (p_user, p_role, p_date, p_start, p_end)
+
+    ON CONFLICT (user_name, role, available_date, start_time)
+    DO UPDATE SET end_time = EXCLUDED.end_time
+
+    RETURNING availability_id INTO v_id;
+
+    RETURN v_id;
+END;
+$$ LANGUAGE plpgsql;
+
+
