@@ -408,3 +408,62 @@ SELECT fn_create_booking(
     '11:00'            -- start_time
 );
 
+SELECT * FROM bookings;
+
+
+
+----7. Payments Table-------
+
+CREATE TABLE IF NOT EXISTS payments (
+    payment_id SERIAL PRIMARY KEY,
+    booking_id INT NOT NULL REFERENCES bookings(booking_id),
+    amount NUMERIC(10,2) NOT NULL,
+    currency TEXT DEFAULT 'THB',
+    status TEXT CHECK (status IN ('pending','paid','failed','refunded')) DEFAULT 'pending',
+    payment_method TEXT CHECK (
+        payment_method IN ('cash','credit_card','debit_card','bank_transfer','e_wallet')
+    ) DEFAULT 'cash',
+    paid_at TIMESTAMPTZ
+);
+
+
+INSERT INTO payments (booking_id, amount, currency, status, payment_method, paid_at) VALUES
+(1, 300,  'THB', 'paid',     'cash',         CURRENT_TIMESTAMP),
+(2, 1000, 'THB', 'failed',   'bank_transfer', NULL),
+(3, 900,  'THB', 'paid',     'credit_card',  CURRENT_TIMESTAMP),
+(4, 700,  'THB', 'pending',  'e_wallet',     NULL),
+(5, 400,  'THB', 'paid',     'debit_card',   CURRENT_TIMESTAMP),
+(6, 500,  'THB', 'refunded', 'cash',         CURRENT_TIMESTAMP),
+(7, 350,  'THB', 'paid',     'e_wallet',     CURRENT_TIMESTAMP),
+(8, 750,  'THB', 'pending',  'bank_transfer', NULL),
+(9, 1000, 'THB', 'paid',     'credit_card',  CURRENT_TIMESTAMP),
+(10,900,  'THB', 'failed',   'debit_card',   NULL);
+
+CREATE OR REPLACE FUNCTION fn_save_payment(
+    p_booking_id INT,
+    p_amount NUMERIC,
+    p_currency TEXT,
+    p_status TEXT
+)
+RETURNS VOID AS $$
+BEGIN
+    -- insert or update payment (1 payment per booking)
+    INSERT INTO payments (booking_id, amount, currency, status, paid_at)
+    VALUES (p_booking_id, p_amount, p_currency, p_status, CURRENT_TIMESTAMP)
+    ON CONFLICT (booking_id)
+    DO UPDATE SET
+        amount  = EXCLUDED.amount,
+        currency = EXCLUDED.currency,
+        status = EXCLUDED.status,
+        paid_at = CURRENT_TIMESTAMP;
+
+    -- if paid → confirm booking too
+    IF p_status = 'paid' THEN
+        UPDATE bookings
+        SET status = 'confirmed'
+        WHERE booking_id = p_booking_id;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+
