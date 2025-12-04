@@ -23,7 +23,7 @@ $$ LANGUAGE plpgsql;
 
 DROP TABLE IF EXISTS user_account CASCADE;
 -- 1. User table-----
-CREATE TABLE user_account (
+CREATE TABLE IF NOT EXISTS user_account (
     user_id SERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL, 
     password TEXT,
@@ -177,7 +177,7 @@ INSERT INTO team_profiles (cleaner_username, full_name, bio, rating) VALUES
 ('cleaner_bath', 'Sparkle Bath', 'Focused entirely on scrubbing bathroom mold and tiles.', 4.8),
 ('cleaner_move', 'Deposit Saver', 'Guaranteed clean to help you get your dorm deposit back.', 5.0);
 
-SELECT * FROM fn_get_top_rated_teams(4.5);
+
 --function for users to find top rating cleaner---- 
 
 CREATE OR REPLACE FUNCTION fn_get_top_rated_teams(p_min_rating DECIMAL)
@@ -192,10 +192,11 @@ END;
 $$ LANGUAGE plpgsql;
 
 SELECT * FROM  fn_get_top_rated_teams('4.5');
+--function for users to find top rating cleaner---- 
 
 DROP TABLE IF EXISTS dorm_locations CASCADE;
 ---4.Location Table------
-CREATE TABLE dorm_locations (
+CREATE TABLE IF NOT EXISTS dorm_locations (
     location_id SERIAL PRIMARY KEY,
     user_name TEXT REFERENCES user_account(username), -- Fixed
     dorm_name TEXT,       
@@ -299,10 +300,10 @@ $$ LANGUAGE plpgsql;
 
 
 
--- should insert a new slot and return its id
+-- insert a new slot and return its id
 SELECT fn_save_service_date_time('cleaner_joy', 'cleaner', '2025-12-05', '09:00', '17:00');
 
--- if you run again with same start_time → it will update end_time, but return same id
+--  update end_time, but return same id
 SELECT fn_save_service_date_time('cleaner_joy', 'cleaner', '2025-12-05', '09:00', '18:00');
 
 
@@ -547,14 +548,14 @@ DROP TABLE IF EXISTS subscription_plans CASCADE;
 
 
 -- 8. Create subscription_plans------
-CREATE TABLE subscription_plans (
+CREATE TABLE IF NOT EXISTS subscription_plans (
     plan_id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     monthly_price NUMERIC(10,2)
 );
 
 -- 9. Create user_subscription-----
-CREATE TABLE user_subscriptions (
+CREATE TABLE IF NOT EXISTS  user_subscriptions (
     subscription_id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES user_account(user_id), 
     plan_id INT NOT NULL REFERENCES subscription_plans(plan_id),
