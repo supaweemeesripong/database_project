@@ -21,14 +21,42 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
+DROP TABLE IF EXISTS user_account CASCADE;
 -- 1. User table-----
-CREATE TABLE  IF NOT EXISTS user_account (
+CREATE TABLE user_account (
     user_id SERIAL PRIMARY KEY,
-    username TEXT,
+    username TEXT UNIQUE NOT NULL, 
     password TEXT,
-    role TEXT DEFAULT 'student' 
+    role TEXT CHECK (role IN ('student', 'cleaner', 'admin')) DEFAULT 'student'
 );
+
+INSERT INTO user_account (username, password, role) VALUES
+-- Students
+('student_tang',  'pass123', 'student'),
+('student_alice', 'pass123', 'student'),
+('student_bob',   'pass123', 'student'),
+('student_cat',   'pass123', 'student'),
+('student_dave',  'pass123', 'student'),
+('student_eve',   'pass123', 'student'),
+('student_frank', 'pass123', 'student'),
+('student_grace', 'pass123', 'student'),
+('student_hank',  'pass123', 'student'),
+('student_ivy',   'pass123', 'student'),
+('student_jack',  'pass123', 'student'),
+-- Cleaners
+('cleaner_joy',     'pass123', 'cleaner'),
+('cleaner_big',     'pass123', 'cleaner'),
+('cleaner_somchai', 'pass123', 'cleaner'),
+('cleaner_fast',    'pass123', 'cleaner'),
+('cleaner_eco',     'pass123', 'cleaner'),
+('cleaner_ac',      'pass123', 'cleaner'),
+('cleaner_laundry', 'pass123', 'cleaner'),
+('cleaner_pest',    'pass123', 'cleaner'),
+('cleaner_student', 'pass123', 'cleaner'),
+('cleaner_night',   'pass123', 'cleaner'),
+('cleaner_bath',    'pass123', 'cleaner'),
+('cleaner_move',    'pass123', 'cleaner'),
+('cleaner_sara',    'pass123', 'cleaner');
 
 -- test user 
 INSERT INTO user_account (username, password, role) 
@@ -128,7 +156,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS team_profiles (
     profile_id SERIAL PRIMARY KEY,
-    cleaner_username TEXT,
+    cleaner_username TEXT REFERENCES user_account(user_id),
     full_name TEXT,
     bio TEXT,
     rating DECIMAL(2,1) 
@@ -149,7 +177,7 @@ INSERT INTO team_profiles (cleaner_username, full_name, bio, rating) VALUES
 ('cleaner_bath', 'Sparkle Bath', 'Focused entirely on scrubbing bathroom mold and tiles.', 4.8),
 ('cleaner_move', 'Deposit Saver', 'Guaranteed clean to help you get your dorm deposit back.', 5.0);
 
-
+SELECT * FROM fn_get_top_rated_teams(4.5);
 --function for users to find top rating cleaner---- 
 
 CREATE OR REPLACE FUNCTION fn_get_top_rated_teams(p_min_rating DECIMAL)
@@ -164,10 +192,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+
+DROP TABLE IF EXISTS dorm_locations CASCADE;
 ---4.Location Table------
 CREATE TABLE dorm_locations (
     location_id SERIAL PRIMARY KEY,
-    user_name TEXT,       
+    user_name TEXT REFERENCES user_account(username), -- Fixed
     dorm_name TEXT,       
     building_name TEXT,   
     room_number TEXT          
@@ -187,7 +217,6 @@ INSERT INTO dorm_locations (user_name, dorm_name, building_name, room_number) VA
 ('student_ivy', 'Tangsin Dorm', 'Building A', '413'),
 ('student_jack', 'Victory Corner', 'North', '777');
 
----
 CREATE OR REPLACE FUNCTION fn_get_user_location(p_user TEXT)
 RETURNS dorm_locations AS $$
 DECLARE
@@ -204,13 +233,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
+SELECT * FROM fn_get_user_location('student_grace');
 
 ---5.Date and time Table-------
 
+
+DROP TABLE IF EXISTS service_date_time CASCADE;
 CREATE TABLE IF NOT EXISTS service_date_time (
     availability_id SERIAL PRIMARY KEY,
-    user_name TEXT NOT NULL,                   
+    user_name TEXT NOT NULL REFERENCES user_account(username),                   
     role TEXT CHECK (role IN ('customer','cleaner')),
     available_date DATE NOT NULL,
     start_time TIME NOT NULL,
@@ -265,6 +296,18 @@ $$ LANGUAGE plpgsql;
 
 
 
+
+
+
+-- should insert a new slot and return its id
+SELECT fn_save_service_date_time('cleaner_joy', 'cleaner', '2025-12-05', '09:00', '17:00');
+
+-- if you run again with same start_time → it will update end_time, but return same id
+SELECT fn_save_service_date_time('cleaner_joy', 'cleaner', '2025-12-05', '09:00', '18:00');
+
+
+SELECT * FROM service_date_time ORDER BY availability_id;
+
 --find matching cleaners, customers available service time
 CREATE OR REPLACE FUNCTION fn_find_matching_cleaners(
     p_customer_username TEXT,
@@ -307,14 +350,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+SELECT *
+FROM fn_find_matching_cleaners('student_tang', '2025-12-05');
+
+
 
 -- 6. Bookings table -----
 CREATE TABLE IF NOT EXISTS bookings (
     booking_id SERIAL PRIMARY KEY,
 
    
-    customer_username TEXT NOT NULL,
-    cleaner_username  TEXT NOT NULL,
+    customer_username TEXT NOT NULL REFERENCES user_account(username),
+    cleaner_username  TEXT NOT NULL REFERENCES user_account(username),
 
     
     service_id  INT NOT NULL REFERENCES services(id),
@@ -334,6 +381,20 @@ CREATE TABLE IF NOT EXISTS bookings (
 
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+INSERT INTO bookings (customer_username, cleaner_username, service_id, location_id, booking_date, start_time, end_time, total_price, status) VALUES
+('student_tang',  'cleaner_joy',     1, 1, CURRENT_DATE, '10:00', '11:00', 300.00, 'confirmed'),
+('student_alice', 'cleaner_big',     2, 2, '2025-12-02', '13:00', '15:00', 1000.00, 'pending'),
+('student_bob',   'cleaner_somchai', 1, 3, '2025-12-03', '09:00', '10:00', 900.00,  'confirmed'),
+('student_cat',   'cleaner_fast',    1, 4, '2025-12-04', '11:00', '12:00', 700.00,  'pending'),
+('student_dave',  'cleaner_eco',     1, 5, '2025-12-05', '14:00', '15:00', 400.00,  'confirmed'),
+('student_eve',   'cleaner_ac',      1, 6, '2025-12-06', '16:00', '17:00', 500.00,  'cancelled'),
+('student_frank', 'cleaner_laundry', 1, 7, '2025-12-07', '08:00', '09:00', 350.00,  'confirmed'),
+('student_grace', 'cleaner_pest',    1, 8, '2025-12-08', '10:00', '11:00', 750.00,  'pending'),
+('student_hank',  'cleaner_joy',     2, 10, '2025-12-09', '12:00', '14:00', 1000.00, 'confirmed'),
+('student_ivy',   'cleaner_big',     2, 11, '2025-12-10', '09:00', '11:00', 900.00,  'pending'),
+('student_jack',  'cleaner_move',    2, 12, '2025-12-11', '15:00', '17:00', 1200.00, 'confirmed'),
+('student_tang',  'cleaner_night',   1, 1,  '2025-12-12', '20:00', '21:00', 300.00,  'confirmed');
 
 
 -- create a new booking based on service duration
@@ -419,7 +480,7 @@ DROP TABLE IF EXISTS payments CASCADE; -----check
 DROP FUNCTION IF EXISTS fn_save_payment;
 CREATE TABLE IF NOT EXISTS payments (
     payment_id SERIAL PRIMARY KEY,
-    booking_id INT NOT NULL, 
+    booking_id INT NOT NULL REFERENCES bookings(booking_id), 
     amount NUMERIC(10,2) NOT NULL,
     currency TEXT DEFAULT 'THB',
     status TEXT CHECK (status IN ('pending','paid','failed','refunded')) DEFAULT 'pending',
@@ -430,8 +491,6 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 
-ALTER TABLE payments
-ADD CONSTRAINT payments_booking_unique UNIQUE (booking_id);
 
 
 INSERT INTO payments (booking_id, amount, currency, status, payment_method, paid_at) VALUES
@@ -497,7 +556,7 @@ CREATE TABLE subscription_plans (
 -- 9. Create user_subscription-----
 CREATE TABLE user_subscriptions (
     subscription_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL, 
+    user_id INT NOT NULL REFERENCES user_account(user_id), 
     plan_id INT NOT NULL REFERENCES subscription_plans(plan_id),
     start_date DATE NOT NULL,
     next_billing_date DATE,
@@ -569,11 +628,13 @@ $$ LANGUAGE plpgsql;
 
 
 --Test subscription function sub_id --
-SELECT fn_start_user_subscription(101, 1, CURRENT_DATE);
+SELECT fn_start_user_subscription(1, 1, CURRENT_DATE);
 
 
-SELECT fn_start_user_subscription(102, 1, '2025-12-25');
+SELECT fn_start_user_subscription(2, 1, '2025-12-25');
 
 
 SELECT * FROM user_subscriptions ORDER BY subscription_id DESC LIMIT 5;
+
+
 
