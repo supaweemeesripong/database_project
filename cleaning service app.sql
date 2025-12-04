@@ -494,7 +494,7 @@ CREATE TABLE subscription_plans (
     monthly_price NUMERIC(10,2)
 );
 
--- Create user_subscription-----
+-- 9. Create user_subscription-----
 CREATE TABLE user_subscriptions (
     subscription_id SERIAL PRIMARY KEY,
     user_id INT NOT NULL, 
@@ -540,7 +540,7 @@ INSERT INTO user_subscriptions (user_id, plan_id, start_date, next_billing_date,
 
 
 
-
+--start user_subscription-----
 CREATE OR REPLACE FUNCTION fn_start_user_subscription(
     p_user_id INT,
     p_plan_id INT,
@@ -568,7 +568,7 @@ $$ LANGUAGE plpgsql;
 
 
 
---Test subscription functio sub_id --
+--Test subscription function sub_id --
 SELECT fn_start_user_subscription(101, 1, CURRENT_DATE);
 
 
