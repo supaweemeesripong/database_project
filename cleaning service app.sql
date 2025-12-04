@@ -191,7 +191,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
+SELECT * FROM  fn_get_top_rated_teams('4.5');
 
 DROP TABLE IF EXISTS dorm_locations CASCADE;
 ---4.Location Table------
